@@ -9,7 +9,8 @@ WORKDIR /data/apps/cmdb
 
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
-RUN apk add --no-cache tzdata gcc musl-dev libffi-dev openldap-dev python3-dev jpeg-dev zlib-dev build-base
+# 勿安装 apk 的 python3-dev：其与官方镜像 /usr/local 的 Python 3.8 无关，却会拉 sqlite-dev 等一大片依赖，易触发 I/O 错误且无必要。
+RUN apk add --no-cache tzdata gcc musl-dev libffi-dev openldap-dev openssl-dev jpeg-dev zlib-dev linux-headers build-base
 
 ENV TZ=Asia/Shanghai
 
