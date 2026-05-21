@@ -699,6 +699,7 @@ const cmdb_en = {
         dataFilter: 'Data Filtering',
         modelFilter: 'Model Filter',
         relationModelFilter: 'Relation Model Filter',
+        relationModelFilterTip: 'Select relation model(s) on the left (e.g. Host) before configuring relation filters',
         format: 'Formats',
         fontColor: 'Font Color',
         backgroundColor: 'Background',

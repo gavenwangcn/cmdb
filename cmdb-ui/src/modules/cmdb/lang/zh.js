@@ -695,6 +695,7 @@ const cmdb_zh = {
         dataFilter: '数据筛选',
         modelFilter: '模型筛选',
         relationModelFilter: '关系模型筛选',
+        relationModelFilterTip: '请先在左侧选择关系模型（如主机），再配置关系模型筛选条件',
         format: '格式',
         fontColor: '字体颜色',
         backgroundColor: '背景颜色',

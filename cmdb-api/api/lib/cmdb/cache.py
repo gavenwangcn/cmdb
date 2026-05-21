@@ -308,7 +308,7 @@ class CMDBCounterCache(object):
         from api.lib.cmdb.search.ci_relation.search import Search as RelSearch
         from api.lib.cmdb.search import SearchError
         from api.lib.cmdb.search.ci import search
-        from api.lib.cmdb.search.ci.db.search import SearchFromDB
+        from api.lib.cmdb.search.ci.db.search import Search as SearchFromDB
         from api.lib.cmdb.attribute import AttributeManager
 
         query = "_type:{}".format(type_id)

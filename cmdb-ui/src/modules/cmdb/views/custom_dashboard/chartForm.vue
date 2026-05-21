@@ -15,12 +15,7 @@
           </a-form-model-item>
           <a-form-model-item :label="$t('type')" prop="category" v-if="chartType !== 'count' && chartType !== 'table'">
             <a-radio-group
-              @change="
-                () => {
-                  resetForm()
-                }
-              "
-              :default-value="1"
+              @change="onCategoryChange"
               v-model="form.category"
             >
               <a-radio-button :value="Number(key)" :key="key" v-for="key in Object.keys(dashboardCategory)">
@@ -47,7 +42,7 @@
             </a-radio-group>
           </a-form-model-item>
           <a-form-model-item
-            v-if="(chartType !== 'table' && form.category !== 2) || (chartType === 'table' && form.tableCategory === 1)"
+            v-if="(chartType !== 'table' && !isRelationCategory) || (chartType === 'table' && form.tableCategory === 1)"
             :label="$t('cmdb.ciType.ciType')"
             prop="type_ids"
           >
@@ -91,7 +86,7 @@
           <a-form-model-item
             prop="type_ids"
             :label="$t('cmdb.custom_dashboard.childCIType')"
-            v-if="['bar', 'line', 'pie'].includes(chartType) && form.category === 2"
+            v-if="['bar', 'line', 'pie'].includes(chartType) && isRelationCategory"
           >
             <a-select
               show-search
@@ -211,7 +206,7 @@
             <span>{{ t.label }}</span>
           </div>
         </div>
-        <h4>{{ form.category === 2 ? $t('cmdb.custom_dashboard.modelFilter') : $t('cmdb.custom_dashboard.dataFilter') }}</h4>
+        <h4>{{ isRelationCategory ? $t('cmdb.custom_dashboard.modelFilter') : $t('cmdb.custom_dashboard.dataFilter') }}</h4>
         <FilterComp
           ref="filterCompModel"
           :isDropdown="false"
@@ -219,9 +214,17 @@
           @setExpFromFilter="setModelFilterExp"
           :expression="filterExp ? `q=${filterExp}` : ''"
         />
-        <template v-if="form.category === 2">
+        <template v-if="isRelationCategory">
           <h4 :style="{ marginTop: '14px' }">{{ $t('cmdb.custom_dashboard.relationModelFilter') }}</h4>
+          <a-alert
+            v-if="!relationAttributes.length"
+            type="info"
+            show-icon
+            :message="$t('cmdb.custom_dashboard.relationModelFilterTip')"
+            :style="{ marginBottom: '8px' }"
+          />
           <FilterComp
+            v-else
             ref="filterCompRelation"
             :isDropdown="false"
             :canSearchPreferenceAttrList="relationAttributes"
@@ -343,7 +346,7 @@ export default {
       relationAttributes: [],
       type: 'add',
       form: {
-        category: 0,
+        category: 1,
         tableCategory: 1,
         name: undefined,
         type_id: undefined,
@@ -415,11 +418,14 @@ export default {
     dashboardCategory() {
       return dashboardCategory()
     },
+    isRelationCategory() {
+      return Number(this.form.category) === 2
+    },
   },
   inject: ['layout'],
   watch: {
     'form.category'(val) {
-      if (val !== 2) {
+      if (Number(val) !== 2) {
         this.targetFilterExp = undefined
         this.relationAttributes = []
       } else if (this.form.type_ids?.length) {
@@ -427,7 +433,7 @@ export default {
       }
       this.$nextTick(() => {
         this.initFilterComp('filterCompModel')
-        if (val === 2) {
+        if (Number(val) === 2) {
           this.initFilterComp('filterCompRelation')
         }
       })
@@ -490,19 +496,19 @@ export default {
           this.commonAttributes = res.attributes
         })
       }
-      if (category === 2 && type_ids?.length) {
+      if (Number(category) === 2 && type_ids?.length) {
         await getCITypeAttributesByTypeIds({ type_ids: type_ids.join(',') }).then((res) => {
           this.relationAttributes = res.attributes
         })
       }
       this.$nextTick(() => {
         this.initFilterComp('filterCompModel')
-        if (category === 2) {
+        if (Number(category) === 2) {
           this.initFilterComp('filterCompRelation')
         }
       })
       const default_form = {
-        category: 0,
+        category: 1,
         name: undefined,
         type_id: undefined,
         type_ids: undefined,
@@ -538,7 +544,7 @@ export default {
     changeCIType(value) {
       this.form.attr_ids = []
       this.commonAttributes = []
-      if (this.form.category === 2 && !Array.isArray(value)) {
+      if (this.isRelationCategory && !Array.isArray(value)) {
         this.form.type_ids = []
         this.targetFilterExp = undefined
         this.relationAttributes = []
@@ -751,7 +757,7 @@ export default {
       if (modelRef && modelRef.handleSubmit) {
         modelRef.handleSubmit()
       }
-      if (this.form.category === 2) {
+      if (this.isRelationCategory) {
         const relationRef = this.$refs.filterCompRelation
         if (relationRef && relationRef.handleSubmit) {
           relationRef.handleSubmit()
@@ -759,10 +765,15 @@ export default {
       }
     },
     getRelationFilterOptions() {
-      if (this.form.category === 2) {
+      if (this.isRelationCategory) {
         return { target_filter: this.targetFilterExp || '' }
       }
       return {}
+    },
+    onCategoryChange(e) {
+      const val = e && e.target ? e.target.value : e
+      this.form.category = Number(val)
+      this.resetForm()
     },
     changeRelationCIType(value) {
       if (value?.length) {
