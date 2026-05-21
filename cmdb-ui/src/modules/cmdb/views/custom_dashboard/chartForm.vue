@@ -99,6 +99,7 @@
               mode="multiple"
               v-model="form.type_ids"
               :placeholder="$t('cmdb.ciType.selectCIType')"
+              @change="changeRelationCIType"
             >
               <a-select-opt-group
                 v-for="(key, index) in Object.keys(level2children)"
@@ -210,14 +211,24 @@
             <span>{{ t.label }}</span>
           </div>
         </div>
-        <h4>{{ $t('cmdb.custom_dashboard.dataFilter') }}</h4>
+        <h4>{{ form.category === 2 ? $t('cmdb.custom_dashboard.modelFilter') : $t('cmdb.custom_dashboard.dataFilter') }}</h4>
         <FilterComp
-          ref="filterComp"
+          ref="filterCompModel"
           :isDropdown="false"
           :canSearchPreferenceAttrList="attributes"
-          @setExpFromFilter="setExpFromFilter"
+          @setExpFromFilter="setModelFilterExp"
           :expression="filterExp ? `q=${filterExp}` : ''"
         />
+        <template v-if="form.category === 2">
+          <h4 :style="{ marginTop: '14px' }">{{ $t('cmdb.custom_dashboard.relationModelFilter') }}</h4>
+          <FilterComp
+            ref="filterCompRelation"
+            :isDropdown="false"
+            :canSearchPreferenceAttrList="relationAttributes"
+            @setExpFromFilter="setTargetFilterExp"
+            :expression="targetFilterExp ? `q=${targetFilterExp}` : ''"
+          />
+        </template>
         <h4>{{ $t('cmdb.custom_dashboard.format') }}</h4>
         <a-form-model :colon="false" :label-col="{ span: 4 }" :wrapper-col="{ span: 20 }">
           <a-form-model-item :label="$t('cmdb.custom_dashboard.fontColor')" v-if="chartType === 'count'">
@@ -329,6 +340,7 @@ export default {
     return {
       visible: false,
       attributes: [],
+      relationAttributes: [],
       type: 'add',
       form: {
         category: 0,
@@ -357,6 +369,7 @@ export default {
       chartColor: '#5DADF2,#86DFB7,#5A6F96,#7BD5FF,#FFB980,#4D58D6,#D9B6E9,#8054FF', // chart color
       isShowPreview: false,
       filterExp: undefined,
+      targetFilterExp: undefined,
       previewData: null,
       barStack: 'total',
       barDirection: 'y',
@@ -404,6 +417,22 @@ export default {
     },
   },
   inject: ['layout'],
+  watch: {
+    'form.category'(val) {
+      if (val !== 2) {
+        this.targetFilterExp = undefined
+        this.relationAttributes = []
+      } else if (this.form.type_ids?.length) {
+        this.changeRelationCIType(this.form.type_ids)
+      }
+      this.$nextTick(() => {
+        this.$refs.filterCompModel?.visibleChange(true, false)
+        if (val === 2) {
+          this.$refs.filterCompRelation?.visibleChange(true, false)
+        }
+      })
+    },
+  },
   methods: {
     async open(type, item = {}) {
       this.visible = true
@@ -421,6 +450,7 @@ export default {
       this.width = width
       this.chartType = chartType
       this.filterExp = item?.options?.filter ?? ''
+      this.targetFilterExp = item?.options?.target_filter ?? ''
       this.chartColor = item?.options?.chartColor ?? '#5DADF2,#86DFB7,#5A6F96,#7BD5FF,#FFB980,#4D58D6,#D9B6E9,#8054FF'
       this.isShadow = item?.options?.isShadow ?? false
 
@@ -460,8 +490,16 @@ export default {
           this.commonAttributes = res.attributes
         })
       }
+      if (category === 2 && type_ids?.length) {
+        await getCITypeAttributesByTypeIds({ type_ids: type_ids.join(',') }).then((res) => {
+          this.relationAttributes = res.attributes
+        })
+      }
       this.$nextTick(() => {
-        this.$refs.filterComp.visibleChange(true, false)
+        this.$refs.filterCompModel?.visibleChange(true, false)
+        if (category === 2) {
+          this.$refs.filterCompRelation?.visibleChange(true, false)
+        }
       })
       const default_form = {
         category: 0,
@@ -488,6 +526,8 @@ export default {
     },
     handleclose() {
       this.attributes = []
+      this.relationAttributes = []
+      this.targetFilterExp = undefined
       this.$refs.chartForm.clearValidate()
       this.isShowPreview = false
       this.visible = false
@@ -498,6 +538,11 @@ export default {
     changeCIType(value) {
       this.form.attr_ids = []
       this.commonAttributes = []
+      if (this.form.category === 2 && !Array.isArray(value)) {
+        this.form.type_ids = []
+        this.targetFilterExp = undefined
+        this.relationAttributes = []
+      }
       this.changeCITypeRequestValue = value
       if ((Array.isArray(value) && value.length) || (!Array.isArray(value) && value)) {
         getCITypeAttributesByTypeIds({ type_ids: Array.isArray(value) ? value.join(',') : value }).then((res) => {
@@ -526,7 +571,7 @@ export default {
         if (valid) {
           const name = this.form.name
           const { chartType, fontColor, bgColor } = this
-          this.$refs.filterComp.handleSubmit()
+          this.submitFilterForms()
           if (this.item.id) {
             const params = {
               ...this.form,
@@ -538,6 +583,7 @@ export default {
                 showIcon: this.form.showIcon,
                 type_ids: this.form.type_ids,
                 filter: this.filterExp,
+                ...this.getRelationFilterOptions(),
                 isShadow: this.isShadow,
               },
             }
@@ -584,6 +630,7 @@ export default {
                 showIcon: this.form.showIcon,
                 type_ids: this.form.type_ids,
                 filter: this.filterExp,
+                ...this.getRelationFilterOptions(),
                 isShadow: this.isShadow,
               },
             }
@@ -643,7 +690,7 @@ export default {
           this.isShowPreview = false
           const name = this.form.name
           const { chartType, fontColor, bgColor } = this
-          this.$refs.filterComp.handleSubmit()
+          this.submitFilterForms()
           const params = {
             ...this.form,
             options: {
@@ -652,6 +699,7 @@ export default {
               showIcon: this.form.showIcon,
               type_ids: this.form.type_ids,
               filter: this.filterExp,
+              ...this.getRelationFilterOptions(),
               isShadow: this.isShadow,
             },
           }
@@ -686,17 +734,43 @@ export default {
         }
       })
     },
-    setExpFromFilter(filterExp) {
-      if (filterExp) {
-        this.filterExp = `${filterExp}`
+    setModelFilterExp(filterExp) {
+      this.filterExp = filterExp || undefined
+    },
+    setTargetFilterExp(filterExp) {
+      this.targetFilterExp = filterExp || undefined
+    },
+    submitFilterForms() {
+      this.$refs.filterCompModel?.handleSubmit()
+      if (this.form.category === 2) {
+        this.$refs.filterCompRelation?.handleSubmit()
+      }
+    },
+    getRelationFilterOptions() {
+      if (this.form.category === 2) {
+        return { target_filter: this.targetFilterExp || '' }
+      }
+      return {}
+    },
+    changeRelationCIType(value) {
+      if (value?.length) {
+        getCITypeAttributesByTypeIds({ type_ids: Array.isArray(value) ? value.join(',') : value }).then((res) => {
+          this.relationAttributes = res.attributes
+          this.$nextTick(() => {
+            this.$refs.filterCompRelation?.visibleChange(true, false)
+          })
+        })
       } else {
-        this.filterExp = undefined
+        this.relationAttributes = []
+        this.targetFilterExp = undefined
       }
     },
     resetForm() {
       this.form.type_id = undefined
       this.form.type_ids = []
       this.form.attr_ids = []
+      this.targetFilterExp = undefined
+      this.relationAttributes = []
       this.$refs.chartForm.clearValidate()
     },
     changeAttr(value) {

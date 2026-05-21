@@ -693,6 +693,8 @@ const cmdb_zh = {
         showIcon: '是否显示icon',
         chartType: '图表类型',
         dataFilter: '数据筛选',
+        modelFilter: '模型筛选',
+        relationModelFilter: '关系模型筛选',
         format: '格式',
         fontColor: '字体颜色',
         backgroundColor: '背景颜色',

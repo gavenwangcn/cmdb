@@ -697,6 +697,8 @@ const cmdb_en = {
         showIcon: 'Display icon',
         chartType: 'Chart Type',
         dataFilter: 'Data Filtering',
+        modelFilter: 'Model Filter',
+        relationModelFilter: 'Relation Model Filter',
         format: 'Formats',
         fontColor: 'Font Color',
         backgroundColor: 'Background',

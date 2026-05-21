@@ -235,7 +235,7 @@ class Search(object):
 
         return {}, None
 
-    def statistics(self, type_ids, need_filter=True):
+    def statistics(self, type_ids, need_filter=True, allowed_target_ids=None):
         self.level = int(self.level)
 
         acl = ACLManager('cmdb')
@@ -287,6 +287,7 @@ class Search(object):
                 _tmp = []
                 if type_ids and lv == self.level:
                     _tmp = [[i for i in x if i[1] in type_ids and
+                             (allowed_target_ids is None or int(i[0]) in allowed_target_ids) and
                              (not id_filter_limit or (key[idx] not in id_filter_limit or
                                                       int(i[0]) in id_filter_limit[key[idx]]) or
                               int(i[0]) in id_filter_limit)] for idx, x in enumerate(res)]
@@ -315,6 +316,7 @@ class Search(object):
                             res = [json.loads(x).items() for x in [i or '{}' for i in rd.get(key, prefix) or []]]
                             if type_ids and lv == self.level:
                                 tmp_res = [[i for i in x if i[1] in type_ids and
+                                            (allowed_target_ids is None or int(i[0]) in allowed_target_ids) and
                                             (not id_filter_limit or (
                                                     key[idx] not in id_filter_limit or
                                                     int(i[0]) in id_filter_limit[key[idx]]) or

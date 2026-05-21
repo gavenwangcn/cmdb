@@ -270,7 +270,8 @@ class CMDBCounterCache(object):
                 res = cls.relation_counter(custom.get('type_id'),
                                            custom.get('level'),
                                            custom.get('options', {}).get('filter', ''),
-                                           custom.get('options', {}).get('type_ids', ''))
+                                           custom.get('options', {}).get('type_ids', ''),
+                                           custom.get('options', {}).get('target_filter', ''))
 
             if res:
                 result[custom['id']] = res
@@ -293,7 +294,8 @@ class CMDBCounterCache(object):
             res = cls.relation_counter(custom.get('type_id'),
                                        custom.get('level'),
                                        custom.get('options', {}).get('filter', ''),
-                                       custom.get('options', {}).get('type_ids', ''))
+                                       custom.get('options', {}).get('type_ids', ''),
+                                       custom.get('options', {}).get('target_filter', ''))
 
         if res and flush:
             result[custom['id']] = res
@@ -302,10 +304,11 @@ class CMDBCounterCache(object):
         return json.loads(json.dumps(res))
 
     @classmethod
-    def relation_counter(cls, type_id, level, other_filer, type_ids):
+    def relation_counter(cls, type_id, level, other_filer, type_ids, target_filter=None):
         from api.lib.cmdb.search.ci_relation.search import Search as RelSearch
         from api.lib.cmdb.search import SearchError
         from api.lib.cmdb.search.ci import search
+        from api.lib.cmdb.search.ci.db.search import SearchFromDB
         from api.lib.cmdb.attribute import AttributeManager
 
         query = "_type:{}".format(type_id)
@@ -328,9 +331,22 @@ class CMDBCounterCache(object):
 
             type_id_names.append((str(i.get('_id')), enum_map.get(attr_value, attr_value)))
 
+        allowed_target_ids = None
+        if target_filter:
+            _type_ids = type_ids if isinstance(type_ids, (list, tuple)) else ([type_ids] if type_ids else [])
+            _type_ids = [int(t) for t in _type_ids if t]
+            if _type_ids:
+                target_query = "_type:({}),{}".format(";".join(map(str, _type_ids)), target_filter)
+                try:
+                    allowed_target_ids = set(map(int, SearchFromDB(
+                        target_query, use_ci_filter=True, only_ids=True, count=1000000).search()))
+                except SearchError as e:
+                    current_app.logger.error(e)
+                    return
+
         s = RelSearch([i[0] for i in type_id_names], level)
         try:
-            stats = s.statistics(type_ids, need_filter=False)
+            stats = s.statistics(type_ids, need_filter=False, allowed_target_ids=allowed_target_ids)
         except SearchError as e:
             current_app.logger.error(e)
             return
