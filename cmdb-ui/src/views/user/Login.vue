@@ -1,8 +1,6 @@
 <template>
   <div class="ops-login">
-    <div class="ops-login-left">
-      <span>{{ $t('cs.login.loginText') }}</span>
-    </div>
+    <div class="ops-login-left"></div>
     <div class="ops-login-right">
       <img src="../../assets/logo_VECMDB.png" />
       <a-form
@@ -223,14 +221,6 @@ export default {
       top: 60%;
       left: 50%;
       transform: translate(-50%, -50%);
-    }
-    > span {
-      color: @text-color_2;
-      position: absolute;
-      bottom: 10%;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 26px;
     }
   }
   .ops-login-right {

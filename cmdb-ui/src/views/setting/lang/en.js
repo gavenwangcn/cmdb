@@ -446,7 +446,7 @@ const cs_en = {
     selectApp: 'Select App',
   },
   login: {
-    loginText: 'OneOps making operations simple',
+    loginText: '',
     username: 'Username/Email',
     usernameRequired: 'Please input Username/Email',
     password: 'Password',
