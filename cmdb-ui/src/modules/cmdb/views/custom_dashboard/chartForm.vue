@@ -426,9 +426,9 @@ export default {
         this.changeRelationCIType(this.form.type_ids)
       }
       this.$nextTick(() => {
-        this.$refs.filterCompModel?.visibleChange(true, false)
+        this.initFilterComp('filterCompModel')
         if (val === 2) {
-          this.$refs.filterCompRelation?.visibleChange(true, false)
+          this.initFilterComp('filterCompRelation')
         }
       })
     },
@@ -496,9 +496,9 @@ export default {
         })
       }
       this.$nextTick(() => {
-        this.$refs.filterCompModel?.visibleChange(true, false)
+        this.initFilterComp('filterCompModel')
         if (category === 2) {
-          this.$refs.filterCompRelation?.visibleChange(true, false)
+          this.initFilterComp('filterCompRelation')
         }
       })
       const default_form = {
@@ -740,10 +740,22 @@ export default {
     setTargetFilterExp(filterExp) {
       this.targetFilterExp = filterExp || undefined
     },
+    initFilterComp(refName, isInitOne = false) {
+      const ref = this.$refs[refName]
+      if (ref && ref.visibleChange) {
+        ref.visibleChange(true, isInitOne)
+      }
+    },
     submitFilterForms() {
-      this.$refs.filterCompModel?.handleSubmit()
+      const modelRef = this.$refs.filterCompModel
+      if (modelRef && modelRef.handleSubmit) {
+        modelRef.handleSubmit()
+      }
       if (this.form.category === 2) {
-        this.$refs.filterCompRelation?.handleSubmit()
+        const relationRef = this.$refs.filterCompRelation
+        if (relationRef && relationRef.handleSubmit) {
+          relationRef.handleSubmit()
+        }
       }
     },
     getRelationFilterOptions() {
@@ -757,7 +769,7 @@ export default {
         getCITypeAttributesByTypeIds({ type_ids: Array.isArray(value) ? value.join(',') : value }).then((res) => {
           this.relationAttributes = res.attributes
           this.$nextTick(() => {
-            this.$refs.filterCompRelation?.visibleChange(true, false)
+            this.initFilterComp('filterCompRelation')
           })
         })
       } else {
