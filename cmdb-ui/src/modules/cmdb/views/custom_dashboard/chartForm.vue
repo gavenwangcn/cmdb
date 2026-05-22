@@ -208,6 +208,7 @@
         </div>
         <h4>{{ isRelationCategory ? $t('cmdb.custom_dashboard.modelFilter') : $t('cmdb.custom_dashboard.dataFilter') }}</h4>
         <FilterComp
+          :key="`filter-model-${filterRenderKey}`"
           ref="filterCompModel"
           :isDropdown="false"
           :canSearchPreferenceAttrList="attributes"
@@ -225,6 +226,7 @@
           />
           <FilterComp
             v-else
+            :key="`filter-relation-${filterRenderKey}`"
             ref="filterCompRelation"
             :isDropdown="false"
             :canSearchPreferenceAttrList="relationAttributes"
@@ -380,7 +382,9 @@ export default {
       level2children: {},
       isShadow: false,
       changeCITypeRequestValue: null,
-      CITypeGroup: []
+      CITypeGroup: [],
+      filterRenderKey: 0,
+      openingChart: false,
     }
   },
   computed: {
@@ -425,6 +429,9 @@ export default {
   inject: ['layout'],
   watch: {
     'form.category'(val) {
+      if (this.openingChart) {
+        return
+      }
       if (Number(val) !== 2) {
         this.targetFilterExp = undefined
         this.relationAttributes = []
@@ -440,73 +447,58 @@ export default {
     },
   },
   methods: {
+    parseChartOptions(options) {
+      if (!options) {
+        return {}
+      }
+      if (typeof options === 'string') {
+        try {
+          return JSON.parse(options)
+        } catch (e) {
+          return {}
+        }
+      }
+      return options
+    },
+    resolveChartType(options, category) {
+      if (options.chartType) {
+        return options.chartType
+      }
+      if (category === 0) {
+        return 'count'
+      }
+      if (category === 2) {
+        return 'bar'
+      }
+      return 'bar'
+    },
     async open(type, item = {}) {
+      this.openingChart = true
       this.visible = true
       this.type = type
       this.item = item
-      const { category = 0, name, type_id, level } = item
-      const chartType = (item.options || {}).chartType || 'count'
-      const fontColor = (item.options || {}).fontColor || '#ffffff'
-      const bgColor = (item.options || {}).bgColor || ['#6ABFFE', '#5375EB']
-      const width = (item.options || {}).w
-      const showIcon = (item.options || {}).showIcon
-      const type_ids = item?.options?.type_ids || []
-      const attr_ids = item?.options?.attr_ids || []
-      const ret = item?.options?.ret || ''
-      this.width = width
+      const options = this.parseChartOptions(item.options)
+      const category = Number(item.category ?? options.category ?? 1)
+      const { name, type_id, level } = item
+      const type_ids = options.type_ids || []
+      const attr_ids = options.attr_ids || []
+      const ret = options.ret || ''
+      const chartType = this.resolveChartType(options, category)
+
+      this.width = options.w
       this.chartType = chartType
-      this.filterExp = item?.options?.filter ?? ''
-      this.targetFilterExp = item?.options?.target_filter ?? ''
-      this.chartColor = item?.options?.chartColor ?? '#5DADF2,#86DFB7,#5A6F96,#7BD5FF,#FFB980,#4D58D6,#D9B6E9,#8054FF'
-      this.isShadow = item?.options?.isShadow ?? false
+      this.filterExp = options.filter || undefined
+      this.targetFilterExp = options.target_filter || undefined
+      this.chartColor = options.chartColor ?? '#5DADF2,#86DFB7,#5A6F96,#7BD5FF,#FFB980,#4D58D6,#D9B6E9,#8054FF'
+      this.isShadow = options.isShadow ?? false
+      this.barDirection = options.barDirection ?? 'y'
+      this.barStack = options.barStack ?? 'total'
 
       if (chartType === 'count') {
-        this.fontColor = fontColor
-        this.bgColor = bgColor
+        this.fontColor = options.fontColor || '#ffffff'
+        this.bgColor = options.bgColor || ['#6ABFFE', '#5375EB']
       }
 
-      if (type_ids?.length || type_id) {
-        const requireTypeIds = type_id ? [type_id] : type_ids
-        await getCITypeAttributesByTypeIds({ type_ids: requireTypeIds.join(',') }).then((res) => {
-          this.attributes = res.attributes
-        })
-      }
-
-      if (type_ids && type_ids.length) {
-        await getCITypeAttributesByTypeIds({ type_ids: type_ids.join(',') }).then((res) => {
-          this.attributes = res.attributes
-        })
-        if ((['bar', 'line', 'pie'].includes(chartType) && category === 1) || chartType === 'table') {
-          this.barDirection = item?.options?.barDirection ?? 'y'
-          this.barStack = item?.options?.barStack ?? 'total'
-          await getCITypeCommonAttributesByTypeIds({
-            type_ids: type_ids.join(','),
-          }).then((res) => {
-            this.commonAttributes = res.attributes
-          })
-        }
-      }
-      if (type_id) {
-        getRecursive_level2children(type_id).then((res) => {
-          this.level2children = res
-        })
-        await getCITypeCommonAttributesByTypeIds({
-          type_ids: type_id,
-        }).then((res) => {
-          this.commonAttributes = res.attributes
-        })
-      }
-      if (Number(category) === 2 && type_ids?.length) {
-        await getCITypeAttributesByTypeIds({ type_ids: type_ids.join(',') }).then((res) => {
-          this.relationAttributes = res.attributes
-        })
-      }
-      this.$nextTick(() => {
-        this.initFilterComp('filterCompModel')
-        if (Number(category) === 2) {
-          this.initFilterComp('filterCompRelation')
-        }
-      })
       const default_form = {
         category: 1,
         name: undefined,
@@ -525,14 +517,52 @@ export default {
         type_ids,
         attr_ids,
         level,
-        showIcon,
+        showIcon: options.showIcon ?? false,
         tableCategory: ret === 'cis' ? 2 : 1,
       }
-      this.getCITypeGroup()
+
+      this.attributes = []
+      this.relationAttributes = []
+      this.commonAttributes = []
+
+      if (category === 2 && type_id) {
+        const res = await getCITypeAttributesByTypeIds({ type_ids: type_id })
+        this.attributes = res.attributes || []
+        const levelRes = await getRecursive_level2children(type_id)
+        this.level2children = levelRes
+        if (type_ids.length) {
+          const relRes = await getCITypeAttributesByTypeIds({ type_ids: type_ids.join(',') })
+          this.relationAttributes = relRes.attributes || []
+        }
+      } else if (type_ids.length || type_id) {
+        const requireTypeIds = type_id ? [type_id] : type_ids
+        const res = await getCITypeAttributesByTypeIds({ type_ids: requireTypeIds.join(',') })
+        this.attributes = res.attributes || []
+        if ((['bar', 'line', 'pie'].includes(chartType) && category === 1) || chartType === 'table') {
+          const commonRes = await getCITypeCommonAttributesByTypeIds({ type_ids: requireTypeIds.join(',') })
+          this.commonAttributes = commonRes.attributes || []
+        }
+      }
+
+      if (type_id && category !== 2) {
+        const levelRes = await getRecursive_level2children(type_id)
+        this.level2children = levelRes
+      }
+
+      await this.getCITypeGroup()
+      this.filterRenderKey += 1
+      await this.$nextTick()
+      this.initFilterComp('filterCompModel')
+      if (category === 2) {
+        await this.$nextTick()
+        this.initFilterComp('filterCompRelation')
+      }
+      this.openingChart = false
     },
     handleclose() {
       this.attributes = []
       this.relationAttributes = []
+      this.filterExp = undefined
       this.targetFilterExp = undefined
       this.$refs.chartForm.clearValidate()
       this.isShowPreview = false
@@ -582,7 +612,7 @@ export default {
             const params = {
               ...this.form,
               options: {
-                ...this.item.options,
+                ...this.parseChartOptions(this.item.options),
                 name,
                 w: this.width,
                 chartType: this.chartType,
@@ -685,10 +715,9 @@ export default {
       this.isShowPreview = false
       if (t.value === 'count') {
         this.form.category = 0
-      } else {
+      } else if (Number(this.form.category) === 0) {
         this.form.category = 1
       }
-      console.log(this.chartType)
     },
     showPreview() {
       this.$refs.chartForm.validate(async (valid) => {
